@@ -34,26 +34,46 @@ export const codeReview = async (
 
   const bedrockConcurrencyLimit = pLimit(options.bedrockConcurrencyLimit)
   const githubConcurrencyLimit = pLimit(options.githubConcurrencyLimit)
+  const prNumberFromInput = options.prNumber && options.prNumber.trim() !== '' ? options.prNumber.trim() : null
 
   if (
     context.eventName !== 'pull_request' &&
-    context.eventName !== 'pull_request_target'
+    context.eventName !== 'pull_request_target'&&
+    !prNumberFromInput
   ) {
     warning(
       `Skipped: current event is ${context.eventName}, only support pull_request event`
     )
     return
   }
-  if (context.payload.pull_request == null) {
-    warning('Skipped: context.payload.pull_request is null')
+
+  let pr: any = context.payload.pull_request
+
+  if (!pr && prNumberFromInput) {
+    try {
+      const { data } = await octokit.pulls.get({
+        owner: repo.owner,
+        repo: repo.repo,
+        pull_number: parseInt(prNumberFromInput, 10)
+      })
+      pr = data
+      info(`Fetched PR data for PR #${prNumberFromInput}`)
+    } catch (error: any) {
+      warning(`Failed to fetch PR data for PR #${prNumberFromInput}: ${error.message}`)
+      return
+    }
+  }
+  
+  if (!pr) {
+    warning('Skipped: no pull request data available.')
     return
   }
 
   const inputs: Inputs = new Inputs()
-  inputs.title = context.payload.pull_request.title
-  if (context.payload.pull_request.body != null) {
+  inputs.title = pr.title
+  if (pr.body != null) {
     inputs.description = commenter.getDescription(
-      context.payload.pull_request.body
+      pr.body
     )
   }
 
@@ -69,7 +89,7 @@ export const codeReview = async (
   // get SUMMARIZE_TAG message
   const existingSummarizeCmt = await commenter.findCommentWithTag(
     SUMMARIZE_TAG,
-    context.payload.pull_request.number
+    pr.number
   )
   let existingCommitIdsBlock = ''
   let existingSummarizeCmtBody = ''
@@ -94,14 +114,14 @@ export const codeReview = async (
 
   if (
     highestReviewedCommitId === '' ||
-    highestReviewedCommitId === context.payload.pull_request.head.sha
+    highestReviewedCommitId === pr.head.sha
   ) {
     info(
       `Will review from the base commit: ${
-        context.payload.pull_request.base.sha as string
+        pr.base.sha as string
       }`
     )
-    highestReviewedCommitId = context.payload.pull_request.base.sha
+    highestReviewedCommitId = pr.base.sha
   } else {
     info(`Will review from commit: ${highestReviewedCommitId}`)
   }
@@ -111,15 +131,15 @@ export const codeReview = async (
     owner: repo.owner,
     repo: repo.repo,
     base: highestReviewedCommitId,
-    head: context.payload.pull_request.head.sha
+    head: pr.head.sha
   })
 
   // Fetch the diff between the target branch's base commit and the latest commit of the PR branch
   const targetBranchDiff = await octokit.repos.compareCommits({
     owner: repo.owner,
     repo: repo.repo,
-    base: context.payload.pull_request.base.sha,
-    head: context.payload.pull_request.head.sha
+    base: pr.base.sha,
+    head: pr.head.sha
   })
 
   const incrementalFiles = incrementalDiff.data.files
@@ -174,8 +194,8 @@ export const codeReview = async (
       githubConcurrencyLimit(async () => {
         // retrieve file contents
         let fileContent = ''
-        if (context.payload.pull_request == null) {
-          warning('Skipped: context.payload.pull_request is null')
+        if (pr == null) {
+          warning('Skipped: pr is null')
           return null
         }
         try {
@@ -183,7 +203,7 @@ export const codeReview = async (
             owner: repo.owner,
             repo: repo.repo,
             path: file.filename,
-            ref: context.payload.pull_request.base.sha
+            ref: pr.base.sha
           })
           if (contents.data != null) {
             if (!Array.isArray(contents.data)) {
@@ -267,7 +287,7 @@ ${hunks.oldHunk}
   let statusMsg = `<details>
 <summary>Commits</summary>
 Files that changed from the base of the PR and between ${highestReviewedCommitId} and ${
-    context.payload.pull_request.head.sha
+    pr.head.sha
   } commits.
 </details>
 ${
@@ -433,7 +453,7 @@ ${filename}: ${summary}
       message += releaseNotesResponse
       try {
         await commenter.updateDescription(
-          context.payload.pull_request.number,
+          pr.number,
           message
         )
       } catch (e: any) {
@@ -538,7 +558,7 @@ ${
 
       let patchesPacked = 0
       for (const [startLine, endLine, patch] of patches) {
-        if (context.payload.pull_request == null) {
+        if (pr == null) {
           warning('No pull request found, skipping.')
           continue
         }
@@ -557,7 +577,7 @@ ${
         let commentChain = ''
         try {
           const allChains = await commenter.getCommentChainsWithinRange(
-            context.payload.pull_request.number,
+            pr.number,
             filename,
             startLine,
             endLine,
@@ -624,7 +644,7 @@ ${commentChain}
               lgtmCount += 1
               continue
             }
-            if (context.payload.pull_request == null) {
+            if (pr == null) {
               warning('No pull request found, skipping.')
               continue
             }
@@ -723,12 +743,12 @@ ${
     // add existing_comment_ids_block with latest head sha
     summarizeComment += `\n${commenter.addReviewedCommitId(
       existingCommitIdsBlock,
-      context.payload.pull_request.head.sha
+      pr.head.sha
     )}`
 
     // post the review
     await commenter.submitReview(
-      context.payload.pull_request.number,
+      pr.number,
       commits[commits.length - 1].sha,
       statusMsg
     )
