@@ -23,6 +23,7 @@ export class Options {
   lightTokenLimits: TokenLimits
   heavyTokenLimits: TokenLimits
   language: string
+  prNumber: string
 
   constructor(
     debug: boolean,
@@ -42,7 +43,8 @@ export class Options {
     bedrockTimeoutMS = '120000',
     bedrockConcurrencyLimit = '6',
     githubConcurrencyLimit = '6',
-    language = 'en-US'
+    language = 'en-US',
+    prNumber = ''
   ) {
     this.debug = debug
     this.disableReview = disableReview
@@ -64,6 +66,7 @@ export class Options {
     this.lightTokenLimits = new TokenLimits(bedrockLightModel)
     this.heavyTokenLimits = new TokenLimits(bedrockHeavyModel)
     this.language = language
+    this.prNumber = prNumber
   }
 
   // print all options using core.info
@@ -88,6 +91,7 @@ export class Options {
     info(`summary_token_limits: ${this.lightTokenLimits.string()}`)
     info(`review_token_limits: ${this.heavyTokenLimits.string()}`)
     info(`language: ${this.language}`)
+    info(`prNumber: ${this.prNumber}`)
   }
 
   checkPath(path: string): boolean {
