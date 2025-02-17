@@ -31,7 +31,8 @@ async function run(): Promise<void> {
     getInput('bedrock_timeout_ms'),
     getInput('bedrock_concurrency_limit'),
     getInput('github_concurrency_limit'),
-    getInput('language')
+    getInput('language'),
+    getInput('pr_number')
   )
 
   // print options
@@ -93,7 +94,8 @@ async function run(): Promise<void> {
     // check if the event is pull_request
     if (
       process.env.GITHUB_EVENT_NAME === 'pull_request' ||
-      process.env.GITHUB_EVENT_NAME === 'pull_request_target'
+      process.env.GITHUB_EVENT_NAME === 'pull_request_target'||
+      (options.prNumber && options.prNumber.trim() !== '')
     ) {
       await codeReview(lightBot, heavyBot, options, prompts)
     } else if (
