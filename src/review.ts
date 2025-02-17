@@ -36,6 +36,8 @@ export const codeReview = async (
   const githubConcurrencyLimit = pLimit(options.githubConcurrencyLimit)
   const prNumberFromInput = options.prNumber && options.prNumber.trim() !== '' ? options.prNumber.trim() : null
 
+  info(`Fetched PR Number #${prNumberFromInput}`)
+
   if (
     context.eventName !== 'pull_request' &&
     context.eventName !== 'pull_request_target'&&
