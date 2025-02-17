@@ -91,7 +91,7 @@ export class Options {
     info(`summary_token_limits: ${this.lightTokenLimits.string()}`)
     info(`review_token_limits: ${this.heavyTokenLimits.string()}`)
     info(`language: ${this.language}`)
-    info(`prNumber: ${this.prNumber}`)
+    info(`pr_number: ${this.prNumber}`)
   }
 
   checkPath(path: string): boolean {
