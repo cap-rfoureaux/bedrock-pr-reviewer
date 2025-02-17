@@ -39,7 +39,7 @@ export const codeReview = async (
   if (
     context.eventName !== 'pull_request' &&
     context.eventName !== 'pull_request_target'&&
-    !prNumberFromInput
+    !(options.prNumber && options.prNumber.trim() !== '')
   ) {
     warning(
       `Skipped: current event is ${context.eventName}, only support pull_request event`
